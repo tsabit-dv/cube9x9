@@ -56,38 +56,39 @@ class WingParity(private val model: CubeModel, private val reg: Regions) {
         return if (fs[0] == a) fs[1] else fs[0]
     }
 
-    /** Paritas (0/1) tiap orbit untuk [state] terhadap target [wt] (warna target per facelet wing). */
-    fun parities(state: IntArray, wt: IntArray): IntArray {
-        // Satu pasangan warna dapat mewakili lebih dari satu wing fisik dalam orbit
-        // yang sama. Itu normal pada kubus besar: wing-wing tersebut tidak dapat
-        // dibedakan hanya dari warna. Simpan semua kandidat, jangan menolak duplikasi.
-        val home = HashMap<Long, ArrayDeque<Int>>()
-        for (key in cubies.keys.sorted()) {
-            val orbit = orbitOf.getValue(key)
-            val k = (orbit.toLong() * 6 + wt[alpha.getValue(key)]) * 6 + wt[beta(key)]
-            home.getOrPut(k) { ArrayDeque() }.addLast(key)
-        }
+    /** Kunci identitas wing: (orbit, warna facelet alpha, warna facelet beta). Tiap wing fisik punya kunci unik. */
+    private fun identityKey(orbit: Int, a: Int, b: Int) = (orbit.toLong() * 6 + a) * 6 + b
 
-        val dest = HashMap<Int, Int>()
-        val ambiguousOrbit = BooleanArray(orbitCount)
-        for ((k, candidates) in home) {
-            if (candidates.size > 1) {
-                // Identitas wing dalam bucket ini tidak dapat diketahui dari stiker.
-                // Paritas orbit menjadi tak-tertentu; hindari koreksi parity palsu.
-                val orbit = (k / 36L).toInt()
-                ambiguousOrbit[orbit] = true
+    /**
+     * Paritas (0/1) tiap orbit untuk [state] terhadap target [wt] (warna target per facelet wing).
+     *
+     * Dalam satu orbit ada 24 wing yang semuanya dapat dibedakan (pasangan warna berurut menurut
+     * label alpha/beta yang ikut berputar bersama wing, jadi sudah memuat kiralitas). Karena itu
+     * duplikasi pasangan warna tidak pernah muncul pada kubus legal, dan selalu berarti input salah.
+     * Kondisi itu ditolak, bukan ditebak.
+     */
+    fun parities(state: IntArray, wt: IntArray): IntArray {
+        val home = HashMap<Long, Int>()
+        for (key in cubies.keys) {
+            val k = identityKey(orbitOf.getValue(key), wt[alpha.getValue(key)], wt[beta(key)])
+            val prev = home.put(k, key)
+            if (prev != null) {
+                throw SolveException(
+                    "Edge tengah tidak unik: ${describeCubie(prev)} dan ${describeCubie(key)} punya pasangan warna sama pada target. " +
+                        "Cek stiker edge di dua posisi itu."
+                )
             }
         }
-        for (key in cubies.keys.sorted()) {
-            val orbit = orbitOf.getValue(key)
-            val k = (orbit.toLong() * 6 + state[alpha.getValue(key)]) * 6 + state[beta(key)]
-            val candidates = home[k]
-                ?: throw SolveException("Warna wing tidak cocok dengan edge manapun (cek input stiker)")
-            if (candidates.isEmpty()) throw SolveException("Jumlah wing dengan pasangan warna tidak seimbang (cek input stiker)")
-            dest[key] = candidates.removeFirst()
-        }
-        if (home.values.any { it.isNotEmpty() }) {
-            throw SolveException("Jumlah wing dengan pasangan warna tidak seimbang (cek input stiker)")
+        val dest = HashMap<Int, Int>()
+        val taken = HashMap<Int, Int>()
+        for (key in cubies.keys) {
+            val k = identityKey(orbitOf.getValue(key), state[alpha.getValue(key)], state[beta(key)])
+            val h = home[k] ?: throw SolveException("Warna wing di ${describeCubie(key)} tidak cocok dengan edge manapun (cek input stiker)")
+            val prev = taken.put(h, key)
+            if (prev != null) {
+                throw SolveException("Wing di ${describeCubie(prev)} dan ${describeCubie(key)} berwarna sama (mustahil pada kubus asli). Cek stiker di dua posisi itu.")
+            }
+            dest[key] = h
         }
         val result = IntArray(orbitCount)
         val seen = HashSet<Int>()
@@ -100,13 +101,44 @@ class WingParity(private val model: CubeModel, private val reg: Regions) {
                 j = dest.getValue(j)
                 len++
             }
-            val orbit = orbitOf.getValue(key)
-            result[orbit] = result[orbit] xor ((len - 1) and 1)
+            result[orbitOf.getValue(key)] = result[orbitOf.getValue(key)] xor ((len - 1) and 1)
         }
-        // Jika ada wing identik dalam orbit, parity tidak dapat ditentukan dari
-        // warna saja. Memilih parity genap adalah matching valid dan mencegah
-        // algoritma melakukan gerakan koreksi yang justru merusak pairing.
-        for (o in 0 until orbitCount) if (ambiguousOrbit[o]) result[o] = 0
         return result
     }
+
+    /**
+     * Periksa [state] (warna sudah dinormalisasi jadi indeks sisi) terhadap kubus selesai: tiap wing
+     * fisik harus muncul tepat satu kali. Mengembalikan daftar masalah dengan lokasi stiker.
+     */
+    fun checkIdentity(state: IntArray): List<String> {
+        val problems = ArrayList<String>()
+        val home = HashMap<Long, Int>()
+        for (key in cubies.keys) {
+            val a = alpha.getValue(key)
+            home[identityKey(orbitOf.getValue(key), model.faceOf(a), model.faceOf(beta(key)))] = key
+        }
+        val seenAt = HashMap<Long, Int>()
+        for (key in cubies.keys) {
+            val k = identityKey(orbitOf.getValue(key), state[alpha.getValue(key)], state[beta(key)])
+            if (!home.containsKey(k)) {
+                problems.add("Wing di ${describeCubie(key)} berwarna mustahil (${colorPair(state, key)}). Cek dua stiker itu.")
+                continue
+            }
+            val prev = seenAt.put(k, key)
+            if (prev != null) {
+                problems.add("Wing di ${describeCubie(prev)} dan ${describeCubie(key)} berwarna sama (${colorPair(state, key)}). " +
+                    "Kubus asli hanya punya satu wing seperti itu; salah satu stiker keliru.")
+            }
+        }
+        if (problems.isEmpty() && seenAt.size != home.size) problems.add("Himpunan wing tidak lengkap (cek input stiker).")
+        return problems
+    }
+
+    private fun colorPair(state: IntArray, key: Int): String {
+        val fs = cubies.getValue(key)
+        return fs.joinToString("/") { "${CubeModel.FACE_LETTERS[state[it]]}" }
+    }
+
+    private fun describeCubie(key: Int): String =
+        cubies.getValue(key).joinToString(" + ") { model.describeFacelet(it) }
 }

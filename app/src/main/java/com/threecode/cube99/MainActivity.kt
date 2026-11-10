@@ -164,6 +164,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startSolve() {
+        val problems = try {
+            com.threecode.cube99.solver.Reducer(n).validate(colors)
+        } catch (e: com.threecode.cube99.solver.SolveException) {
+            listOf(e.message ?: "Input tidak valid")
+        }
+        if (problems.isNotEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Input kubus tidak sah")
+                .setMessage(problems.take(5).joinToString("\n\n") + "\n\nKoordinat (baris,kolom) dimulai dari 1, dihitung dari pojok kiri atas sisi seperti pada model 3D.")
+                .setPositiveButton("Mengerti", null).show()
+            return
+        }
         storage.startSession(colors)
         startActivity(Intent(this, SolveActivity::class.java))
     }

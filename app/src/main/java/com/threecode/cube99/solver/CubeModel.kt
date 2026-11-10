@@ -55,6 +55,9 @@ class CubeModel(val n: Int) {
     fun coordY(i: Int) = fy[i]
     fun coordZ(i: Int) = fz[i]
     fun faceOf(i: Int) = i / nn
+
+    /** Teks lokasi stiker untuk pesan kesalahan, misalnya "U baris 1 kolom 3" (1-based). */
+    fun describeFacelet(i: Int) = "${FACE_LETTERS[faceOf(i)]}(${rowOf(i) + 1},${colOf(i) + 1})"
     fun rowOf(i: Int) = (i % nn) / n
     fun colOf(i: Int) = i % n
 

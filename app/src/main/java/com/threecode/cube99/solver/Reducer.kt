@@ -15,6 +15,11 @@ class Reducer(val n: Int) {
     private val centerSetups by lazy { MacroLibrary.outerSetups(model, 1) }
     private val centerLib by lazy { MacroLibrary(model, centerSetups, MacroLibrary.centerCores(model, reg), reg.center) }
     private val wingParity by lazy { WingParity(model, reg) }
+    private val validator by lazy { CubeValidator(model, reg, wingParity) }
+
+    /** Masalah legalitas kubus (kosong jika sah). [colors] boleh berupa warna sembarang. */
+    fun validate(colors: IntArray): List<String> = validator.validate(normalize(colors))
+
     private val wingLib by lazy {
         val slabSetups = setups + MacroLibrary.innerMoves(model).map { listOf(it) }
         MacroLibrary(model, slabSetups, MacroLibrary.wingCores(model, reg), reg.wing)
@@ -47,6 +52,10 @@ class Reducer(val n: Int) {
      */
     fun solve(colors: IntArray, onStage: (String, Float) -> Unit = { _, _ -> }): List<Move> {
         val start = normalize(colors)
+        val problems = validator.validate(start)
+        if (problems.isNotEmpty()) {
+            throw SolveException("Kubus tidak sah: " + problems.take(3).joinToString(" | ") + if (problems.size > 3) " (+${problems.size - 3} masalah lain)" else "")
+        }
         val all = ArrayList<Move>()
         val state = start.copyOf()
 
@@ -63,6 +72,8 @@ class Reducer(val n: Int) {
             } ?: throw SolveException("Solver center macet")
             model.applyAll(state, mv)
             all.addAll(mv)
+            // postkondisi: semua center benar
+            for (i in 0 until model.size) if (reg.center[i] && state[i] != cTarget[i]) throw SolveException("Postkondisi center gagal")
         }
         solveCenters("Menyusun center")
 
@@ -91,6 +102,8 @@ class Reducer(val n: Int) {
         } ?: throw SolveException("Solver edge macet")
         model.applyAll(state, wMoves)
         all.addAll(wMoves)
+        // postkondisi: center tetap selesai dan semua wing berpasangan, paritas orbit genap
+        if (stageOf(state) < 2) throw SolveException("Postkondisi edge gagal")
 
         // 3. 3x3
         onStage("Menyelesaikan 3x3", 0f)
