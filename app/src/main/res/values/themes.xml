@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.Cube99" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
+</resources>
