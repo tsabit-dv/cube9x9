@@ -50,6 +50,10 @@ class CubeModel(val n: Int) {
 
     /** Kunci kubus fisik tempat facelet i berada (facelet satu kubus punya kunci sama). */
     fun cubieKey(i: Int) = (fx[i] * n + fy[i]) * n + fz[i]
+    /** Koordinat kubus fisik (0..n-1) tempat facelet i berada; x kanan, y atas, z depan. */
+    fun coordX(i: Int) = fx[i]
+    fun coordY(i: Int) = fy[i]
+    fun coordZ(i: Int) = fz[i]
     fun faceOf(i: Int) = i / nn
     fun rowOf(i: Int) = (i % nn) / n
     fun colOf(i: Int) = i % n

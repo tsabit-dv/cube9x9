@@ -21,7 +21,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Ketuk sisi di jaring untuk memilih, lalu cat stiker sesuai kubusmu."
+            android:text="Putar model 3D, lalu ketuk stiker untuk mengecat sesuai kubusmu. Ketuk sisi di jaring untuk melihat sisi itu."
             android:textSize="13sp" />
 
         <com.threecode.cube99.NetView
@@ -44,11 +44,17 @@
             android:layout_height="wrap_content"
             android:textSize="13sp" />
 
-        <com.threecode.cube99.FaceGridView
-            android:id="@+id/gridView"
+        <com.threecode.cube99.Cube3DView
+            android:id="@+id/cubeView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchPaintDrag"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Seret = cat (matikan untuk seret = putar model)" />
 
         <LinearLayout
             android:id="@+id/palette"

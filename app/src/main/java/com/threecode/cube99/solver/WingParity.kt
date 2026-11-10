@@ -58,16 +58,36 @@ class WingParity(private val model: CubeModel, private val reg: Regions) {
 
     /** Paritas (0/1) tiap orbit untuk [state] terhadap target [wt] (warna target per facelet wing). */
     fun parities(state: IntArray, wt: IntArray): IntArray {
-        // peta (orbit, warnaAlpha, warnaBeta) -> kubus rumah
-        val home = HashMap<Long, Int>()
-        for (key in cubies.keys) {
-            val k = (orbitOf.getValue(key).toLong() * 6 + wt[alpha.getValue(key)]) * 6 + wt[beta(key)]
-            if (home.put(k, key) != null) throw SolveException("Susunan edge tengah ambigu")
+        // Satu pasangan warna dapat mewakili lebih dari satu wing fisik dalam orbit
+        // yang sama. Itu normal pada kubus besar: wing-wing tersebut tidak dapat
+        // dibedakan hanya dari warna. Simpan semua kandidat, jangan menolak duplikasi.
+        val home = HashMap<Long, ArrayDeque<Int>>()
+        for (key in cubies.keys.sorted()) {
+            val orbit = orbitOf.getValue(key)
+            val k = (orbit.toLong() * 6 + wt[alpha.getValue(key)]) * 6 + wt[beta(key)]
+            home.getOrPut(k) { ArrayDeque() }.addLast(key)
         }
+
         val dest = HashMap<Int, Int>()
-        for (key in cubies.keys) {
-            val k = (orbitOf.getValue(key).toLong() * 6 + state[alpha.getValue(key)]) * 6 + state[beta(key)]
-            dest[key] = home[k] ?: throw SolveException("Warna wing tidak cocok dengan edge manapun (cek input stiker)")
+        val ambiguousOrbit = BooleanArray(orbitCount)
+        for ((k, candidates) in home) {
+            if (candidates.size > 1) {
+                // Identitas wing dalam bucket ini tidak dapat diketahui dari stiker.
+                // Paritas orbit menjadi tak-tertentu; hindari koreksi parity palsu.
+                val orbit = (k / 36L).toInt()
+                ambiguousOrbit[orbit] = true
+            }
+        }
+        for (key in cubies.keys.sorted()) {
+            val orbit = orbitOf.getValue(key)
+            val k = (orbit.toLong() * 6 + state[alpha.getValue(key)]) * 6 + state[beta(key)]
+            val candidates = home[k]
+                ?: throw SolveException("Warna wing tidak cocok dengan edge manapun (cek input stiker)")
+            if (candidates.isEmpty()) throw SolveException("Jumlah wing dengan pasangan warna tidak seimbang (cek input stiker)")
+            dest[key] = candidates.removeFirst()
+        }
+        if (home.values.any { it.isNotEmpty() }) {
+            throw SolveException("Jumlah wing dengan pasangan warna tidak seimbang (cek input stiker)")
         }
         val result = IntArray(orbitCount)
         val seen = HashSet<Int>()
@@ -80,8 +100,13 @@ class WingParity(private val model: CubeModel, private val reg: Regions) {
                 j = dest.getValue(j)
                 len++
             }
-            result[orbitOf.getValue(key)] = result[orbitOf.getValue(key)] xor ((len - 1) and 1)
+            val orbit = orbitOf.getValue(key)
+            result[orbit] = result[orbit] xor ((len - 1) and 1)
         }
+        // Jika ada wing identik dalam orbit, parity tidak dapat ditentukan dari
+        // warna saja. Memilih parity genap adalah matching valid dan mencegah
+        // algoritma melakukan gerakan koreksi yang justru merusak pairing.
+        for (o in 0 until orbitCount) if (ambiguousOrbit[o]) result[o] = 0
         return result
     }
 }

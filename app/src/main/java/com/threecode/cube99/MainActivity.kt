@@ -25,15 +25,6 @@ class MainActivity : AppCompatActivity() {
     private val swatches = ArrayList<View>()
     private val countViews = ArrayList<TextView>()
 
-    private val hints = arrayOf(
-        "Lihat dari atas. Tepi ATAS gambar = arah sisi Belakang (B).",
-        "Lihat dari kanan, sisi Atas (U) berada di atas gambar.",
-        "Lihat dari depan, sisi Atas (U) berada di atas gambar.",
-        "Lihat dari bawah. Tepi ATAS gambar = arah sisi Depan (F).",
-        "Lihat dari kiri, sisi Atas (U) berada di atas gambar.",
-        "Lihat dari belakang, sisi Atas (U) berada di atas gambar.",
-    )
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
@@ -43,9 +34,8 @@ class MainActivity : AppCompatActivity() {
 
         b.netView.n = n
         b.netView.onFaceTap = { selectFace(it) }
-        b.gridView.n = n
-        b.gridView.onPaint = { r, c ->
-            val i = model.idx(face, r, c)
+        b.cubeView.n = n
+        b.cubeView.onPaint = { i ->
             if (colors[i] != paint) {
                 colors[i] = paint
                 refresh()
@@ -65,6 +55,7 @@ class MainActivity : AppCompatActivity() {
                 .setPositiveButton("Ya") { _, _ -> colors = randomColors(); refresh() }
                 .setNegativeButton("Batal", null).show()
         }
+        b.switchPaintDrag.setOnCheckedChangeListener { _, on -> b.cubeView.paintOnDrag = on }
         b.btnHelp.setOnClickListener { showHelp() }
         selectFace(0)
     }
@@ -137,18 +128,18 @@ class MainActivity : AppCompatActivity() {
     private fun selectFace(f: Int) {
         face = f
         b.netView.selectedFace = f
-        b.gridView.face = f
+        b.cubeView.lookAt(f)
         b.faceTitle.text = "Sisi ${CubeModel.FACE_NAMES[f]}"
-        b.faceHint.text = hints[f]
+        b.faceHint.text = "Samakan dengan kubus fisik: pegang dengan U di atas dan F di depan. Huruf di tengah tiap sisi = nama sisi."
         refresh()
     }
 
     private fun refresh() {
         for (i in argb.indices) argb[i] = Palette.colors[colors[i]]
         b.netView.facelets = argb
-        b.gridView.facelets = argb
+        b.cubeView.facelets = argb
         b.netView.invalidate()
-        b.gridView.invalidate()
+        b.cubeView.invalidate()
         storage.saveInput(colors)
 
         val counts = IntArray(6)
@@ -183,8 +174,8 @@ class MainActivity : AppCompatActivity() {
             .setMessage(
                 "1. Pegang kubus dengan satu sisi menghadap atas (U) dan satu sisi menghadap depan (F). " +
                     "Tetap konsisten sampai semua sisi terisi.\n\n" +
-                    "2. Pilih sisi di jaring, lalu cat 81 stiker sesuai arah pandang yang tertulis di bawah judul sisi. " +
-                    "Seret jari untuk mengecat beberapa stiker sekaligus.\n\n" +
+                    "2. Putar model 3D dengan menyeret jari, ketuk stiker untuk mengecatnya. " +
+                    "Nyalakan sakelar 'Seret = cat' untuk mengecat banyak stiker sekaligus. Ketuk sisi di jaring untuk menghadapkan sisi itu.\n\n" +
                     "3. Titik di tengah tiap sisi adalah center tetap. Warnanya menentukan warna sisi itu.\n\n" +
                     "4. Tiap warna harus tepat 81 stiker. Kalau solver menolak, biasanya ada stiker yang salah isi " +
                     "atau arah pandang sisi tertukar.\n\n" +
