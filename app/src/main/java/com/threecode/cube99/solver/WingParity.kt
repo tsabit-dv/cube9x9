@@ -121,23 +121,29 @@ class WingParity(private val model: CubeModel, private val reg: Regions) {
         for (key in cubies.keys) {
             val k = identityKey(orbitOf.getValue(key), state[alpha.getValue(key)], state[beta(key)])
             if (!home.containsKey(k)) {
-                problems.add("Wing di ${describeCubie(key)} berwarna mustahil (${colorPair(state, key)}). Cek dua stiker itu.")
+                problems.add("Wing di ${describeCubie(key)} berwarna mustahil (${coloredStickers(state, key)}). Cek dua stiker itu.")
                 continue
             }
             val prev = seenAt.put(k, key)
             if (prev != null) {
-                problems.add("Wing di ${describeCubie(prev)} dan ${describeCubie(key)} berwarna sama (${colorPair(state, key)}). " +
-                    "Kubus asli hanya punya satu wing seperti itu; salah satu stiker keliru.")
+                problems.add("Wing di ${describeCubie(prev)} (${coloredStickers(state, prev)}) dan ${describeCubie(key)} (${coloredStickers(state, key)}) " +
+                    "adalah wing yang sama persis, termasuk arah kiralitasnya. Kubus asli hanya punya satu; salah satunya keliru. " +
+                    "Wing dengan dua warna yang sama tetapi kiralitas berbeda boleh ada dan tidak ditolak.")
+            }
+        }
+        if (problems.isNotEmpty() && problems.none { it.contains("mustahil") }) {
+            val missing = home.filterKeys { it !in seenAt }.values.map { describeCubie(it) }
+            if (missing.isNotEmpty()) {
+                problems.add("Wing yang tidak muncul sama sekali, asalnya di kubus selesai pada: ${missing.joinToString("; ")}. Salah satu stiker di atas seharusnya berwarna ini.")
             }
         }
         if (problems.isEmpty() && seenAt.size != home.size) problems.add("Himpunan wing tidak lengkap (cek input stiker).")
         return problems
     }
 
-    private fun colorPair(state: IntArray, key: Int): String {
-        val fs = cubies.getValue(key)
-        return fs.joinToString("/") { "${CubeModel.FACE_LETTERS[state[it]]}" }
-    }
+    /** Warna tiap stiker wing beserta lokasinya, mis. "U(1,6)=B, B(1,4)=L". */
+    private fun coloredStickers(state: IntArray, key: Int): String =
+        cubies.getValue(key).joinToString(", ") { "${model.describeFacelet(it)}=${CubeModel.FACE_LETTERS[state[it]]}" }
 
     private fun describeCubie(key: Int): String =
         cubies.getValue(key).joinToString(" + ") { model.describeFacelet(it) }
